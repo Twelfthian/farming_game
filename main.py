@@ -66,7 +66,7 @@ class Tile(pygame.sprite.Sprite):
         elif self.prev_hovered and not self.hovered:
             ...
             
-        self.image = dirt_images[self.state]
+        self.image = tile_images[self.state]
 
 class TileHandler:
     def __init__(self, world_size:tuple[int,int]):
