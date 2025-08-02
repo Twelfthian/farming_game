@@ -1,0 +1,130 @@
+import pygame, assets
+from core import *
+from game_data import GAME_DATA
+from player import Player
+from tile import Tile
+
+from debugging import debug_print
+
+class StateHandler:
+    '''This is the object that will hold and handle the `GameStates`. It is a `Singleton`.'''
+    _instance = None
+    _initialized = False
+
+    def __new__(cls) -> "StateHandler":
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized: return
+        self._initialized = True
+
+        self.states:"list[GameState]" = []
+
+    def update(self, inputs:Inputs, dt:float):
+        assert len(self.states) > 0
+        self.states[-1].update(inputs, dt)
+
+    def draw(self, display:pygame.Surface):
+        self.states[-1].draw(display)
+
+class GameState:
+    '''This is the generic `GameState` class. For each new `GameState`, the methods and attributes in here
+    should also exist in each of the subclasses (but not `enter_state` and `destroy_state`). Make sure that
+    `super().__init__( <args>, <kwargs> )` is used in the `__init__` function and that each new `GameState`
+    inherits from this generic class.'''
+    def __init__(self):
+        ...
+
+    def update(self, inputs:Inputs, dt:float):
+        '''Standard `update` method for `GameState`. Each new `GameState` must have this method and must
+        accept the same arguments.'''
+        ...
+
+    def draw(self, display:pygame.Surface):
+        '''Standard `draw` method for `GameState`. Each new `GameState` must have this method and must
+        accept the same arguments.'''
+        ...
+
+    def enter_state(self):
+        '''Makes this `GameState` the current state in the `StateHandler`'''
+        StateHandler().states.append(self)
+
+    def destroy_state(self):
+        '''Removes the `GameState` from the `StateHandler`'''
+        StateHandler().states.remove(self)
+
+class WorldState(GameState):
+    '''This is the `GameState` where our player will run around and do things in the world.'''
+    def __init__(self, world_size:tuple[int,int], player_pos:tuple[int,int]):
+        super().__init__()
+        self.player = Player(player_pos)
+
+        # tile_holder is just an easy way to access specific tiles, but it also holds the tiles
+        self.tile_holder = {(x,y): Tile((x * GAME_DATA["world"]["tile"]["size"][0],
+                                         y * GAME_DATA["world"]["tile"]["size"][1]))
+                                         for y in range(world_size[1]) for x in range(world_size[0])}
+        
+        # tile_group will hold references to all the tiles for sprite reasons
+        self.tile_group:pygame.sprite.Group[Tile] = pygame.sprite.Group(*list(self.tile_holder.values()))
+
+        self._offset = (0,0)
+    
+    def _calculate_offset(self):
+        self._offset = (
+            GAME_DATA["display"]["size"][0] / 2 - self.player.rect.centerx,
+            GAME_DATA["display"]["size"][1] / 2 - self.player.rect.centery
+        )
+
+    def _apply_offset(self, rect:pygame.FRect|pygame.Rect) -> tuple[int|float,int|float]:
+        return (rect.x + self._offset[0], rect.y + self._offset[1])
+    
+    def _is_onscreen(self, rect:pygame.FRect|pygame.Rect) -> bool:
+        return True
+    
+    def world_pos_from_screen_pos(self, pos:tuple[int,int]) -> tuple[int,int]:
+        return (pos[0] - self._offset[0], pos[1] - self._offset[1])
+
+    def update(self, inputs:Inputs, dt:float):
+        mouse_pos = self.world_pos_from_screen_pos(inputs.mouse_pos)
+        # update player
+        player_speed_factor = self.player.speed * dt
+        self.player.rect.x += (inputs.get_key(pygame.K_d) - inputs.get_key(pygame.K_a)) * player_speed_factor
+        self.player.rect.y += (inputs.get_key(pygame.K_s) - inputs.get_key(pygame.K_w)) * player_speed_factor
+        self._calculate_offset() # calculate the screen offset
+        
+        # update the tiles
+        for tile in self.tile_group:
+            tile.prev_hovered = tile.hovered
+            tile.prev_clicked = tile.clicked
+            
+            if tile.rect.collidepoint(*mouse_pos):
+                tile.hovered = True
+                if inputs.mouse_buttons[0]:
+                    tile.clicked = True
+                else:
+                    tile.clicked = False
+            else:
+                tile.hovered = False
+                tile.clicked = False
+            
+            if tile.clicked and not tile.prev_clicked:
+                tile.state = (tile.state + 1) % 3
+            elif (tile.hovered and not tile.prev_hovered) or (tile.hovered and tile.prev_clicked and not tile.clicked):
+                ...
+            elif tile.prev_hovered and not tile.hovered:
+                ...
+                
+            tile.image = assets.TILE_IMAGES[tile.state]
+
+    def draw(self, display:pygame.Surface):
+        display.fill((0,0,0)) # color screen black
+
+        # draw tiles
+        for tile in self.tile_group:
+            if self._is_onscreen(tile.rect): # only draw if we can see
+                display.blit(tile.image, self._apply_offset(tile.rect))
+
+        # draw player (we do this later so the player is on top of the tiles)
+        display.blit(self.player.image, self._apply_offset(self.player.rect))

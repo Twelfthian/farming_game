@@ -1,0 +1,13 @@
+{
+    "display": {
+        "size": [800,600]
+    },
+    "world": {
+        "tile": {
+            "size": [64,64]
+        }
+    },
+    "player": {
+        "speed": 500
+    }
+}
