@@ -66,7 +66,7 @@ class Tile(pygame.sprite.Sprite):
         elif self.prev_hovered and not self.hovered:
             ...
             
-        self.image = dirt_images[self.state]
+        self.image = tile_images[self.state]
 
 class TileHandler:
     def __init__(self, world_size:tuple[int,int]):
@@ -92,6 +92,8 @@ if __name__ == "__main__":
     inputs = Inputs()
     tile_handler = TileHandler((12,9))
     
+    player_rect = pygame.Rect(0,0,10,10)
+
     running = True
     while running:
         for event in pygame.event.get():
@@ -105,12 +107,15 @@ if __name__ == "__main__":
                 inputs.unpress(event.key)
         inputs.update()
         
+        player_rect.x += (inputs.get_key(pygame.K_d) - inputs.get_key(pygame.K_a)) * 10
+        player_rect.y += (inputs.get_key(pygame.K_s) - inputs.get_key(pygame.K_w)) * 10
+
         tile_handler.update(inputs, 0.0)
         
         display.fill((0,0,0))
                 
         tile_handler.draw(display)
-        
+        pygame.draw.rect(display, "red", player_rect)
         pygame.display.flip()
         pygame.display.set_caption(f"FPS: {clock.get_fps()}")
         
