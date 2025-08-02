@@ -66,11 +66,25 @@ class WorldState(GameState):
                                          for y in range(world_size[1]) for x in range(world_size[0])}
         # tile_group will hold references to all the tiles for sprite reasons
         self.tile_group:pygame.sprite.Group[Tile] = pygame.sprite.Group(*list(self.tile_holder.values()))
+        self._offset = (0,0)
+    
+    def _calculate_offset(self):
+        self._offset = (
+            GAME_DATA["display"]["size"][0] / 2 - self.player.rect.centerx,
+            GAME_DATA["display"]["size"][1] / 2 - self.player.rect.centery
+        )
+
+    def _apply_offset(self, rect:pygame.FRect|pygame.Rect) -> tuple[int|float,int|float]:
+        return (rect.x + self._offset[0], rect.y + self._offset[1])
+    
+    def _is_onscreen(self, rect:pygame.FRect|pygame.Rect) -> bool:
+        return True
 
     def update(self, inputs:Inputs, dt:float):
-        speed_factor = self.player.speed * dt
-        self.player.rect.x += (inputs.get_key(pygame.K_d) - inputs.get_key(pygame.K_a)) * speed_factor
-        self.player.rect.y += (inputs.get_key(pygame.K_s) - inputs.get_key(pygame.K_w)) * speed_factor
+        player_speed_factor = self.player.speed * dt
+        self.player.rect.x += (inputs.get_key(pygame.K_d) - inputs.get_key(pygame.K_a)) * player_speed_factor
+        self.player.rect.y += (inputs.get_key(pygame.K_s) - inputs.get_key(pygame.K_w)) * player_speed_factor
+        self._calculate_offset()
 
         for tile in self.tile_group:
             tile.update(inputs, dt)
@@ -78,7 +92,10 @@ class WorldState(GameState):
     def draw(self, display:pygame.Surface):
         display.fill((0,0,0)) # color screen black
 
+        # draw tiles
         for tile in self.tile_group:
-            display.blit(tile.image, tile.rect)
+            if self._is_onscreen(tile):
+                display.blit(tile.image, self._apply_offset(tile.rect))
 
-        display.blit(self.player.image, self.player.rect)
+        # draw player (we do this later so the player is on top of the tiles)
+        display.blit(self.player.image, self._apply_offset(self.player.rect))
