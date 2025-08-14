@@ -26,3 +26,12 @@ class Inputs:
             return self.keys[key]
         else:
             return False
+        
+class SpriteSheet:
+    def __init__(self, filepath:str, image_size:tuple[int,int]):
+        self.sheet = pygame.image.load(filepath)
+        num_images = self.sheet.get_width() // image_size[0]
+        self.images = [self.sheet.subsurface(pygame.Rect(x * image_size[0], 0, image_size[0], image_size[1])) for x in range(0, num_images)]
+
+    def get_image(self, index:int) -> pygame.Surface:
+        return self.images[index]
